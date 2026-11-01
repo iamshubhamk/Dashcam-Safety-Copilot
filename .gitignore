@@ -1,0 +1,19 @@
+# Data, weights and training runs never go in git (size + dataset licences)
+data/
+weights/
+runs/
+*.pt
+*.onnx
+*.engine
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Notebooks
+.ipynb_checkpoints/
