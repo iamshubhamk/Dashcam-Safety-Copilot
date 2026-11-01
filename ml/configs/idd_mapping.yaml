@@ -1,0 +1,21 @@
+# IDD Detection label -> target class name (from configs/classes.yaml), or null to drop the box.
+#
+# Every label the converter finds in your download must be listed here. If it meets an
+# unlisted label it stops before writing anything and prints the label, so we never
+# silently lose or mislabel boxes. The names below come from the IDD Detection docs and
+# should be confirmed against the converter's printed label counts on the real data.
+car: car
+bus: bus
+truck: truck
+caravan: truck        # rare; merged into truck rather than kept as a tiny class
+trailer: truck
+motorcycle: two_wheeler
+bicycle: two_wheeler
+autorickshaw: auto_rickshaw
+person: pedestrian
+animal: animal
+rider: null           # the two_wheeler box already covers the collision footprint
+vehicle fallback: null  # ambiguous vehicles: box dropped, image kept
+traffic sign: null
+traffic light: null
+train: null

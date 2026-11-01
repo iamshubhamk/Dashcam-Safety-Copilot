@@ -1,0 +1,16 @@
+# COCO class name -> target class, used only to score the stock COCO-pretrained baseline.
+# COCO has no auto_rickshaw, pothole, barricade, speed_breaker or debris, so the
+# baseline scores 0 on those by construction; the eval report keeps them separate
+# from "shared" classes so the comparison stays fair.
+car: car
+bus: bus
+truck: truck
+motorcycle: two_wheeler
+bicycle: two_wheeler
+person: pedestrian
+cow: animal
+dog: animal
+horse: animal
+sheep: animal
+elephant: animal
+bird: animal

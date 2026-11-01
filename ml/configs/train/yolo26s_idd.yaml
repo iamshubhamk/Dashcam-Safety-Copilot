@@ -1,0 +1,25 @@
+# Training config for the main Phase 1 model.
+# Keys under `train` are passed straight to Ultralytics' model.train().
+# Why these values:
+#  - yolo26s: the "small" YOLO26 model. Big enough to learn IDD's crowded scenes, small
+#    enough to train on a free Kaggle T4 and to run on a 4 GB laptop GPU later.
+#    Starting from COCO-pretrained weights ("transfer learning") is far faster than
+#    training from scratch because the network already knows edges, wheels, people.
+#  - imgsz 640: standard YOLO input size. 960 is a planned ablation, because distant
+#    vehicles and potholes are only a few pixels wide at 640.
+#  - batch 16: fits a T4's 16 GB at 640. Lower it if you hit "CUDA out of memory".
+#  - patience 20: stop early if val mAP hasn't improved for 20 epochs.
+#  - seed + deterministic: so a rerun gives (nearly) the same model.
+model: yolo26s.pt
+data: data/processed/merged/data.yaml
+train:
+  epochs: 100
+  imgsz: 640
+  batch: 16
+  patience: 20
+  seed: 0
+  deterministic: true
+  workers: 4
+  project: runs/train
+  name: yolo26s_idd
+  exist_ok: false

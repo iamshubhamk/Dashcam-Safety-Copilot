@@ -1,0 +1,41 @@
+[project]
+name = "dashcam-ml"
+version = "0.1.0"
+description = "Dataset converters, training and evaluation for the Dashcam Safety Copilot detector"
+requires-python = ">=3.11,<3.14"
+# Core deps are enough for the converters, merge, stats and the mAP maths (and their tests).
+dependencies = [
+    "numpy==2.3.5",
+    "pillow==12.0.0",
+    "pyyaml==6.0.3",
+]
+
+[project.optional-dependencies]
+# Training / evaluation. On Kaggle, torch is preinstalled with CUDA and is reused.
+train = [
+    "ultralytics==8.4.197",
+]
+dev = [
+    "pytest==9.2.0",
+    "pycocotools==2.0.11",  # reference implementation our mAP code is tested against
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["dashcam_ml*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dashcam_ml", "conftest"]
