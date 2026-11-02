@@ -55,6 +55,13 @@ ttc:
   window_s: 0.6         # fit over this much recent history
   min_samples: 4        # fewer points than this -> no TTC yet
   max_gap_s: 0.5        # history older than this gap is discarded (track was lost)
+  # Only trust a growth trend at least this many standard errors above zero. Filters
+  # TTC "spikes" from jittery boxes on small, distant objects. 0 disables the gate.
+  min_significance: 3.0
+  # No TTC for boxes smaller than this (sqrt(width*height) in pixels): a weak detection on
+  # a far car "grows" as the detector settles, which looks like a crash course. Found on a
+  # calm highway clip (TTC 1.3 s on a ~15 px car). Lower = earlier highway warnings, more noise.
+  min_size_px: 22
 
 alerts:
   # Each alert type creates one event per "episode": it opens when the condition is

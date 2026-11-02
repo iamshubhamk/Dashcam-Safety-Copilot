@@ -71,3 +71,33 @@ def test_log_rate_is_scale_invariant():
     a = approaching(30.0, 8.0, fps=25, n=12, k=100.0)
     b = approaching(30.0, 8.0, fps=25, n=12, k=5000.0)
     assert math.isclose(fit_log_scale_rate(a), fit_log_scale_rate(b), rel_tol=1e-9)
+
+
+def test_settling_small_box_gives_no_ttc():
+    """Replay of a real false alarm (Udacity highway clip, frames 178-185): a weak ~15 px
+    detection of a distant car grew ~30% in 4 frames as the detector settled -> TTC 1.3 s."""
+    widths = [13.2, 13.9, 14.9, 16.4, 16.9, 16.7, 16.7, 15.9, 15.6]
+    heights = [9.6, 10.1, 10.9, 12.2, 12.8, 12.9, 13.1, 12.7, 12.7]
+    ungated = TrackSizeHistory(window_s=0.6, min_samples=4, max_gap_s=0.5)
+    gated = TrackSizeHistory(window_s=0.6, min_samples=4, max_gap_s=0.5, min_significance=3.0, min_size_px=22)
+    raw = [ungated.update(1, i / 25, w, h)[0] for i, (w, h) in enumerate(zip(widths, heights, strict=True))]
+    out = [gated.update(1, i / 25, w, h)[0] for i, (w, h) in enumerate(zip(widths, heights, strict=True))]
+    assert min(t for t in raw if t is not None) < 2.0  # the false alarm, reproduced
+    assert all(t is None for t in out)
+
+
+def test_min_size_does_not_block_nearby_approach():
+    # Same approach as below but with large boxes (k=3000 -> 150+ px)
+    h = TrackSizeHistory(window_s=0.6, min_samples=4, max_gap_s=0.5, min_significance=3.0, min_size_px=22)
+    ttc = None
+    for s in approaching(20.0, 10.0, fps=30, n=18, k=3000.0):
+        ttc, _ = h.update(1, s.time_s, s.size_px, s.size_px)
+    assert ttc is not None
+
+
+def test_gate_keeps_real_approach():
+    h = TrackSizeHistory(window_s=0.6, min_samples=4, max_gap_s=0.5, min_significance=3.0)
+    ttc = None
+    for s in approaching(20.0, 10.0, fps=30, n=18):
+        ttc, _ = h.update(1, s.time_s, s.size_px, s.size_px)
+    assert ttc == pytest.approx((20.0 - 10.0 * 17 / 30) / 10.0, rel=0.05)

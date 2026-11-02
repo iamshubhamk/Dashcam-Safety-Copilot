@@ -15,6 +15,7 @@ dependencies = [
 # Same version as ml/ so weights trained there load here.
 run = [
     "ultralytics==8.4.197",
+    "lap==0.5.13",  # ByteTrack's assignment solver; Ultralytics only auto-installs it at runtime
 ]
 dev = [
     "pytest==9.2.0",

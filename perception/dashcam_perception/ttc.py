@@ -10,7 +10,16 @@ Size is sqrt(width * height): it averages out jitter in either dimension.
 
 Limitations:
 - Assumes constant closing speed over the window (braking makes it optimistic).
-- Box jitter from the detector becomes TTC noise, so we fit over several frames.
+- Box jitter from the detector becomes TTC noise, so we fit over several frames AND only
+  trust a slope that is clearly bigger than its own noise (`min_significance` standard
+  errors). Without that gate, a 15-pixel car far ahead whose box wobbles by 1-2 px
+  produced "TTC 1.1 s" on a calm highway clip. The gate costs range, not near-field recall:
+  a nearby object closing fast has a large, clean slope.
+- Tiny boxes are unreliable: a weak detection 15 px wide can "grow" 30% in a few frames as
+  the detector settles, which reads as TTC ~1.3 s. Sizes below `min_size_px` (geometric
+  mean of width and height) get no TTC. With the default 22 px and a 1280-wide frame, that
+  is a car ~70 m ahead: early warnings at highway speed start a bit later (TTC ~3 s at
+  80 km/h instead of 4 s), city-speed warnings are unaffected.
 - A box cut off by the frame edge stops growing even as the object gets closer; callers
   should treat edge-touching boxes as "very close" separately.
 """
@@ -58,26 +67,55 @@ def ttc_from_rate(rate: float | None, lag_s: float = 0.0) -> float | None:
     return max(_MIN_TTC_S, 1.0 / rate - lag_s)
 
 
+def fit_with_error(samples: list[SizeSample]) -> tuple[float, float] | None:
+    """(slope, standard error of the slope) of ln(size) vs time; None if not computable."""
+    pts = [(s.time_s, math.log(s.size_px)) for s in samples if s.size_px > 0]
+    n = len(pts)
+    slope = fit_log_scale_rate(samples)
+    if slope is None or n < 3:
+        return None if slope is None else (slope, 0.0)
+    mt = sum(t for t, _ in pts) / n
+    ml = sum(v for _, v in pts) / n
+    var_t = sum((t - mt) ** 2 for t, _ in pts)
+    resid = sum((v - (ml + slope * (t - mt))) ** 2 for t, v in pts)
+    return slope, math.sqrt(resid / (n - 2) / var_t)
+
+
 class TrackSizeHistory:
     """Rolling per-track size history. One instance for the whole video."""
 
-    def __init__(self, window_s: float, min_samples: int, max_gap_s: float) -> None:
+    def __init__(
+        self,
+        window_s: float,
+        min_samples: int,
+        max_gap_s: float,
+        min_significance: float = 0.0,
+        min_size_px: float = 0.0,
+    ) -> None:
+        self.min_significance = min_significance
+        self.min_size_px = min_size_px
         self.window_s = window_s
         self.min_samples = min_samples
         self.max_gap_s = max_gap_s
         self._hist: dict[int, deque[SizeSample]] = {}
 
     def update(self, track_id: int, time_s: float, width: float, height: float) -> tuple[float | None, float | None]:
-        """Add a sample and return (ttc_s, rate). Both None until enough history exists."""
+        """Add a sample and return (ttc_s, rate). Both None until enough history exists, or
+        while the size trend is not clearly above box jitter."""
         h = self._hist.setdefault(track_id, deque())
         if h and time_s - h[-1].time_s > self.max_gap_s:
             h.clear()  # track was lost for a while; old sizes no longer comparable
         h.append(SizeSample(time_s, math.sqrt(max(width, 0.0) * max(height, 0.0))))
         while h and time_s - h[0].time_s > self.window_s:
             h.popleft()
-        if len(h) < self.min_samples:
+        if len(h) < self.min_samples or h[-1].size_px < self.min_size_px:
             return None, None
-        rate = fit_log_scale_rate(list(h))
+        fit = fit_with_error(list(h))
+        if fit is None:
+            return None, None
+        rate, se = fit
+        if abs(rate) < self.min_significance * se:
+            return None, None  # trend indistinguishable from jitter
         mean_t = sum(x.time_s for x in h) / len(h)
         return ttc_from_rate(rate, lag_s=time_s - mean_t), rate
 

@@ -50,6 +50,8 @@ class TTCConfig:
     window_s: float
     min_samples: int
     max_gap_s: float
+    min_significance: float
+    min_size_px: float
 
 
 @dataclass(frozen=True)
@@ -166,7 +168,11 @@ def parse_config(data: dict[str, Any], known_classes: list[str] | None = None) -
         window_s=_positive(_req(tt, "window_s", "ttc"), "ttc.window_s"),
         min_samples=int(_positive(_req(tt, "min_samples", "ttc"), "ttc.min_samples")),
         max_gap_s=_positive(_req(tt, "max_gap_s", "ttc"), "ttc.max_gap_s"),
+        min_significance=float(tt.get("min_significance", 0.0)),
+        min_size_px=float(tt.get("min_size_px", 0.0)),
     )
+    if ttc.min_significance < 0:
+        raise ConfigError("'ttc.min_significance' must be >= 0")
     if ttc.min_samples < 2:
         raise ConfigError("'ttc.min_samples' must be >= 2 (a slope needs two points)")
 

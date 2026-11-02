@@ -11,7 +11,9 @@ from dashcam_perception.types import Box, FrameInfo, ObjectState, TrackedObject
 class SceneEstimator:
     def __init__(self, cfg: PipelineConfig) -> None:
         self.cfg = cfg
-        self.sizes = TrackSizeHistory(cfg.ttc.window_s, cfg.ttc.min_samples, cfg.ttc.max_gap_s)
+        self.sizes = TrackSizeHistory(
+            cfg.ttc.window_s, cfg.ttc.min_samples, cfg.ttc.max_gap_s, cfg.ttc.min_significance, cfg.ttc.min_size_px
+        )
 
     def step(self, frame: FrameInfo, objects: list[TrackedObject]) -> list[ObjectState]:
         out: list[ObjectState] = []

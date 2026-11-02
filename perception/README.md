@@ -70,6 +70,13 @@ camera's field of view and mount height.
 | obstacle in lane (pothole, barricade, speed breaker, debris) | within ~30 m | within ~12 m |
 | tailgating, lead-vehicle braking | off: they need our own speed (GPS/OBD), which we don't have yet. The config refuses to enable them. |
 
+**Noise gates on TTC.** A first run on a calm public highway clip raised false alarms from far,
+weakly detected cars (~15 px) whose boxes "grew" as the detector settled. Two gates fixed it:
+TTC is only computed for boxes at least `ttc.min_size_px` (22 px) in size, and only when the
+growth trend is clearly bigger than its own noise (`ttc.min_significance`). The cost is range,
+not near-field recall: at 80 km/h the first warning now comes about 3 s before impact instead
+of 4 s, and city-speed warnings are unchanged (both cases are covered by tests).
+
 A condition must hold in 2 of the last 3 frames of that object (about 70 ms) before it alerts,
 so a single glitchy frame can't trigger it. While the same object keeps triggering, that's
 one event with its worst severity; it closes after 1 s without the condition.
