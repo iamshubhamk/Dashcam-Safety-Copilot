@@ -17,3 +17,6 @@ __pycache__/
 
 # Notebooks
 .ipynb_checkpoints/
+
+# Pipeline outputs
+out/
