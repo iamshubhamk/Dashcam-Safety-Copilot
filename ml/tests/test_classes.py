@@ -32,3 +32,10 @@ def test_repo_mapping_files_only_use_known_classes(class_names: list[str]) -> No
 def test_typo_in_target_is_rejected(class_names: list[str]) -> None:
     with pytest.raises(MappingError, match="two-wheeler"):
         resolve_mapping({"motorcycle": "two-wheeler"}, class_names, "test")
+
+
+def test_repo_obstacle_mapping_is_valid(class_names: list[str]) -> None:
+    datasets = yaml.safe_load((REPO / "ml/configs/obstacle_mapping.yaml").read_text())["datasets"]
+    for name, entry in datasets.items():
+        assert entry.get("license"), f"{name}: licence must be recorded"
+        resolve_mapping(entry["labels"], class_names, name)

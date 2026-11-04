@@ -6,11 +6,27 @@
 # data.yaml must appear under `labels`, mapped to a target class or null (drop).
 # `source` and `license` are copied into the dataset stats so the licence of every
 # image we train on is recorded by a script, not from memory.
-datasets: {}
+datasets:
+  # Indian dashcam pothole frames (BharatPotHole), forward view.
+  bharatpothole:
+    source: https://universe.roboflow.com/yolo-ewrwa/dashcam-mg6en/dataset/14
+    license: CC BY 4.0
+    labels:
+      pothole: pothole
+
+  road_obstacles:
+    source: https://universe.roboflow.com/final-thesis-ydrub/road-obstacles
+    license: CC BY 4.0
+    labels:
+      Barricade: barricade
+      Pothole: pothole
+      Speed Bump: speed_breaker
+      Normal Road: null   # a "this is a normal road" box, not an obstacle: dropped
+
+# Template for another dataset:
 #  example_potholes:
 #    source: https://universe.roboflow.com/<workspace>/<project>/dataset/<version>
 #    license: CC BY 4.0
 #    labels:
 #      pothole: pothole
-#      Potholes: pothole
 #      manhole: null
