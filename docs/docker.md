@@ -63,16 +63,15 @@ Do this in a second PowerShell window. Set up the perception venv once, as descr
 uv sync
 $repo = (Resolve-Path ..).Path
 $env:DASHCAM_DATABASE_URL = "postgresql+psycopg://dashcam:dashcam@localhost:5432/dashcam"
-$env:DASHCAM_STORAGE_DIR  = "$repo\data\storage"      # use an ABSOLUTE path, same folder the API container mounts
+$env:DASHCAM_STORAGE_DIR  = "$repo\data\storage"      # same folder the API container mounts
 $env:DASHCAM_WORK_DIR     = "$repo\data\work"
 $env:DASHCAM_PERCEPTION_PYTHON = "$repo\perception\.venv\Scripts\python.exe"
 $env:DASHCAM_PERCEPTION_DEVICE = "0"                   # first GPU
 uv run python -m app.worker
 ```
 
-Use absolute paths for the storage and work folders. The worker runs perception from the repo root,
-so a relative path like `..\data\storage` points at the wrong place, and the job fails with
-"video not found".
+Relative paths work too. They resolve against the folder you start the worker in, but the
+full path makes it obvious that the worker and the API container share the same folder.
 
 ## Running the backend tests against the Compose database
 
