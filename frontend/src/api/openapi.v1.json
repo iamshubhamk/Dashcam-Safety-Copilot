@@ -1,0 +1,1395 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dashcam Safety Copilot API",
+    "description": "Upload dashcam videos, get risky moments, a driving score and a hazard map.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/trips/import": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Import Results",
+        "description": "Create a finished trip from a results zip (no video processing happens here).",
+        "operationId": "import_results_api_v1_trips_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_results_api_v1_trips_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trips": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Upload Trip",
+        "description": "Upload a video (and optional GPS file). Processing starts in the background; poll\nGET /trips/{id} until status is `done` or `failed`.",
+        "operationId": "upload_trip_api_v1_trips_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_trip_api_v1_trips_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "List Trips",
+        "description": "Trips, newest first.",
+        "operationId": "list_trips_api_v1_trips_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TripStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TripOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trips/{trip_id}": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Get Trip",
+        "operationId": "get_trip_api_v1_trips__trip_id__get",
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Delete Trip",
+        "description": "Delete a trip, its events, report, GPS points and files. Hazards seen only on this trip go too.",
+        "operationId": "delete_trip_api_v1_trips__trip_id__delete",
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trip Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trips/{trip_id}/report": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_report_api_v1_trips__trip_id__report_get",
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trips/{trip_id}/events": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "List Events",
+        "description": "A trip's events in video order.",
+        "operationId": "list_events_api_v1_trips__trip_id__events_get",
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trip Id"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EventType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EventOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trips/{trip_id}/video": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Get Video",
+        "description": "The original or annotated video. Supports HTTP Range, so the player can seek.",
+        "operationId": "get_video_api_v1_trips__trip_id__video_get",
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trip Id"
+            }
+          },
+          {
+            "name": "annotated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Annotated"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trips/{trip_id}/retry": {
+      "post": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Retry Trip",
+        "description": "Requeue a failed trip.",
+        "operationId": "retry_trip_api_v1_trips__trip_id__retry_post",
+        "parameters": [
+          {
+            "name": "trip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Trip Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Get Event",
+        "operationId": "get_event_api_v1_events__event_id__get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{event_id}/clip": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Get Clip",
+        "description": "The short clip around one event (about 5 s before to 5 s after).",
+        "operationId": "get_clip_api_v1_events__event_id__clip_get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hazards": {
+      "get": {
+        "tags": [
+          "hazards"
+        ],
+        "summary": "List Hazards",
+        "description": "Hazards inside the visible map area, most-seen first.",
+        "operationId": "list_hazards_api_v1_hazards_get",
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "west,south,east,north",
+              "examples": [
+                "72.8,18.9,73.0,19.1"
+              ],
+              "title": "Bbox"
+            },
+            "description": "west,south,east,north"
+          },
+          {
+            "name": "class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/HazardClass"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HazardList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/healthz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Healthz",
+        "description": "API up + database reachable + a worker seen recently. 503 if the database is down.",
+        "operationId": "healthz_api_v1_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_import_results_api_v1_trips_import_post": {
+        "properties": {
+          "results": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Results",
+            "description": "Zip of a perception output folder"
+          },
+          "gps": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gps",
+            "description": "Optional GPS track: .gpx or .csv"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "title": "Body_import_results_api_v1_trips_import_post"
+      },
+      "Body_upload_trip_api_v1_trips_post": {
+        "properties": {
+          "video": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Video",
+            "description": "Dashcam video: .mp4, .mov, .m4v, .avi or .mkv"
+          },
+          "gps": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gps",
+            "description": "Optional GPS track: .gpx or .csv"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video"
+        ],
+        "title": "Body_upload_trip_api_v1_trips_post"
+      },
+      "EventOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "trip_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trip Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "class_name": {
+            "type": "string",
+            "title": "Class Name"
+          },
+          "track_id": {
+            "type": "integer",
+            "title": "Track Id"
+          },
+          "start_s": {
+            "type": "number",
+            "title": "Start S"
+          },
+          "end_s": {
+            "type": "number",
+            "title": "End S"
+          },
+          "peak_s": {
+            "type": "number",
+            "title": "Peak S"
+          },
+          "min_ttc_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Ttc S"
+          },
+          "min_distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Distance M"
+          },
+          "distance_confidence": {
+            "type": "string",
+            "title": "Distance Confidence"
+          },
+          "max_confidence": {
+            "type": "number",
+            "title": "Max Confidence"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lon": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lon"
+          },
+          "has_clip": {
+            "type": "boolean",
+            "title": "Has Clip"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "trip_id",
+          "type",
+          "severity",
+          "class_name",
+          "track_id",
+          "start_s",
+          "end_s",
+          "peak_s",
+          "min_ttc_s",
+          "min_distance_m",
+          "distance_confidence",
+          "max_confidence",
+          "lat",
+          "lon",
+          "has_clip",
+          "metrics"
+        ],
+        "title": "EventOut"
+      },
+      "EventType": {
+        "type": "string",
+        "enum": [
+          "forward_collision",
+          "obstacle_in_lane",
+          "tailgating",
+          "harsh_braking"
+        ],
+        "title": "EventType"
+      },
+      "FeedbackLine": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "event_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Event Ids"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "text",
+          "event_ids"
+        ],
+        "title": "FeedbackLine"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HazardClass": {
+        "type": "string",
+        "enum": [
+          "pothole",
+          "barricade",
+          "speed_breaker",
+          "debris"
+        ],
+        "title": "HazardClass"
+      },
+      "HazardList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HazardOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "HazardList"
+      },
+      "HazardOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "hazard_class": {
+            "type": "string",
+            "title": "Hazard Class"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "seen_count": {
+            "type": "integer",
+            "title": "Seen Count"
+          },
+          "trip_count": {
+            "type": "integer",
+            "title": "Trip Count"
+          },
+          "first_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "hazard_class",
+          "lat",
+          "lon",
+          "seen_count",
+          "trip_count",
+          "first_seen_at",
+          "last_seen_at"
+        ],
+        "title": "HazardOut"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          },
+          "worker": {
+            "type": "string",
+            "title": "Worker"
+          },
+          "worker_last_seen_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Last Seen S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database",
+          "worker",
+          "worker_last_seen_s"
+        ],
+        "title": "HealthOut"
+      },
+      "NotChecked": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "label",
+          "status",
+          "reason"
+        ],
+        "title": "NotChecked"
+      },
+      "Page_EventOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Page[EventOut]"
+      },
+      "Page_TripOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TripOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Page[TripOut]"
+      },
+      "ReportOut": {
+        "properties": {
+          "trip_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trip Id"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "risk_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Rate"
+          },
+          "exposure_unit": {
+            "type": "string",
+            "title": "Exposure Unit"
+          },
+          "exposure_value": {
+            "type": "number",
+            "title": "Exposure Value"
+          },
+          "provisional": {
+            "type": "boolean",
+            "title": "Provisional"
+          },
+          "scoring_version": {
+            "type": "integer",
+            "title": "Scoring Version"
+          },
+          "breakdown": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Breakdown"
+          },
+          "feedback": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackLine"
+            },
+            "type": "array",
+            "title": "Feedback"
+          },
+          "not_checked": {
+            "items": {
+              "$ref": "#/components/schemas/NotChecked"
+            },
+            "type": "array",
+            "title": "Not Checked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trip_id",
+          "score",
+          "risk_rate",
+          "exposure_unit",
+          "exposure_value",
+          "provisional",
+          "scoring_version",
+          "breakdown",
+          "feedback",
+          "not_checked"
+        ],
+        "title": "ReportOut"
+      },
+      "Severity": {
+        "type": "string",
+        "enum": [
+          "warning",
+          "critical"
+        ],
+        "title": "Severity"
+      },
+      "TripOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "distance_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Km"
+          },
+          "has_gps": {
+            "type": "boolean",
+            "title": "Has Gps"
+          },
+          "has_original_video": {
+            "type": "boolean",
+            "title": "Has Original Video"
+          },
+          "has_annotated_video": {
+            "type": "boolean",
+            "title": "Has Annotated Video"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "status",
+          "source",
+          "original_filename",
+          "duration_s",
+          "distance_km",
+          "has_gps",
+          "has_original_video",
+          "has_annotated_video",
+          "score",
+          "event_count",
+          "error",
+          "created_at",
+          "processed_at"
+        ],
+        "title": "TripOut"
+      },
+      "TripStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "processing",
+          "done",
+          "failed"
+        ],
+        "title": "TripStatus"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
