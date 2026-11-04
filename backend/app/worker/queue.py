@@ -57,11 +57,14 @@ def claim(db: Session) -> Claimed | None:
 
 def heartbeat(db: Session, job_id: uuid.UUID) -> bool:
     """Returns False if the job is no longer ours (recovered as stale, or its trip was deleted)."""
-    n = db.execute(
-        update(Job).where(Job.id == job_id, Job.status == JobStatus.running).values(heartbeat_at=func.now())
-    ).rowcount
+    row = db.execute(
+        update(Job)
+        .where(Job.id == job_id, Job.status == JobStatus.running)
+        .values(heartbeat_at=func.now())
+        .returning(Job.id)
+    ).first()
     db.commit()
-    return n == 1
+    return row is not None
 
 
 def succeed(db: Session, job_id: uuid.UUID) -> None:

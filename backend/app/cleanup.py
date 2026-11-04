@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         total = sum(t.video_bytes or 0 for t in trips)
         for t in trips:
             print(f"{'deleting' if args.yes else 'would delete'} {t.video_key} ({(t.video_bytes or 0) / 1e6:.0f} MB)")
-            if args.yes:
+            if args.yes and t.video_key is not None:
                 key, t.video_key = t.video_key, None
                 db.commit()  # forget the key first: a crash leaves an orphan file, never a dangling key
                 storage.delete(key)
