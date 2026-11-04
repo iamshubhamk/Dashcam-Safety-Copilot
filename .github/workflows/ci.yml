@@ -58,6 +58,47 @@ jobs:
       - name: Tests
         run: uv run --frozen pytest -q
 
+  backend:
+    # The API and job-queue tests need a real Postgres (SKIP LOCKED, enums, JSONB),
+    # so CI starts one as a service container. Tests create dashcam_test themselves.
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dashcam
+          POSTGRES_PASSWORD: dashcam
+          POSTGRES_DB: dashcam
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U dashcam"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DASHCAM_TEST_DATABASE_URL: postgresql+psycopg://dashcam:dashcam@localhost:5432/dashcam_test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install (backend + perception core, from the lockfile)
+        run: uv sync --frozen --extra dev
+      - name: Lint
+        run: uvx ruff@${RUFF_VERSION} check .
+      - name: Format check
+        run: uvx ruff@${RUFF_VERSION} format --check .
+      - name: Type check
+        continue-on-error: true  # 2 known errors (cleanup.py:50, worker/queue.py:60); make blocking once fixed
+        run: uv run --frozen --with mypy==${MYPY_VERSION} --with types-PyYAML==6.0.12.20250915 mypy --ignore-missing-imports app
+      - name: Tests (incl. Alembic migrations)
+        run: uv run --frozen pytest -q
+
   frontend:
     runs-on: ubuntu-24.04
     defaults:
