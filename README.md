@@ -1,5 +1,7 @@
 # Dashcam Safety Copilot
 
+[![CI](https://github.com/iamshubhamk/Dashcam-Safety-Copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/iamshubhamk/Dashcam-Safety-Copilot/actions/workflows/ci.yml)
+
 Real-time road-scene perception for small Indian fleets: detect vehicles, pedestrians,
 animals and road obstacles from a dashcam, track them, estimate time-to-collision, raise
 alerts, and show events on a fleet dashboard.
