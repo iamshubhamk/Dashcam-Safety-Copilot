@@ -1,0 +1,16 @@
+# Roboflow Universe datasets for road obstacles (IDD has no pothole/barricade/
+# speed-breaker/debris boxes).
+#
+# For each dataset you download (format: "YOLOv8"/"YOLO" export), add an entry whose key
+# is the --dataset-name you pass to the converter. Every class name in that dataset's
+# data.yaml must appear under `labels`, mapped to a target class or null (drop).
+# `source` and `license` are copied into the dataset stats so the licence of every
+# image we train on is recorded by a script, not from memory.
+datasets: {}
+#  example_potholes:
+#    source: https://universe.roboflow.com/<workspace>/<project>/dataset/<version>
+#    license: CC BY 4.0
+#    labels:
+#      pothole: pothole
+#      Potholes: pothole
+#      manhole: null

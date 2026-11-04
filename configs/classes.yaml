@@ -1,0 +1,20 @@
+# Shared contract: the detector's output classes.
+# Used by ml/ (training + eval), perception/ (alert rules) and backend/ (event types).
+# Changing ids or names breaks trained weights and stored events, so propose
+# changes in the architecture thread first and bump `version`.
+version: 1
+classes:
+  0: car
+  1: bus
+  2: truck
+  3: two_wheeler
+  4: auto_rickshaw
+  5: pedestrian
+  6: animal
+  7: pothole
+  8: barricade
+  9: speed_breaker
+  10: debris
+groups:
+  road_users: [car, bus, truck, two_wheeler, auto_rickshaw, pedestrian, animal]
+  obstacles: [pothole, barricade, speed_breaker, debris]
