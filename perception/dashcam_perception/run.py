@@ -1,7 +1,7 @@
 """CLI: python -m dashcam_perception.run --video x.mp4 --out out/
 
 Run from the repo root (config paths are relative to it). Writes:
-  out/events.json      alert events (draft schema, see events.py)
+  out/events.json      alert events + trip summary (schema v1, see schema.py)
   out/annotated.mp4    video with lane, boxes, distance/TTC and alert banners
   out/clips/           ~5 s before/after each event
   out/run_summary.json frames, processing FPS, event counts (script-produced numbers)
@@ -18,10 +18,12 @@ from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
-from dashcam_perception.alerts import AlertEngine
-from dashcam_perception.config import DEFAULT_CONFIG, ConfigError, load_config
-from dashcam_perception.events import SCHEMA_VERSION, write_events
+from dashcam_perception.alerts import AlertEngine, AlertType
+from dashcam_perception.config import DEFAULT_CONFIG, ConfigError, load_classes, load_classes_version, load_config
+from dashcam_perception.events import build_document, write_document
 from dashcam_perception.scene import SceneEstimator, suppress_riders
+from dashcam_perception.schema import SCHEMA_VERSION, Video
+from dashcam_perception.summary import TripAccumulator
 from dashcam_perception.types import FrameInfo
 
 
@@ -77,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     tracker = Tracker(cfg.detector, cfg.tracker_config)
     scene = SceneEstimator(cfg)
     engine = AlertEngine(cfg.alerts)
+    trip = TripAccumulator(cfg.alerts.forward_collision, frame_dt_s=1.0 / fps)
     writer = None
     if cfg.output.annotated_video and not args.no_video:
         writer = cv2.VideoWriter(str(args.out / "annotated.mp4"), cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
@@ -94,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
                 objects = suppress_riders(objects, cfg.detector.rider_overlap)
             states = scene.step(frame, objects)
             active = engine.step(frame, states)
+            trip.step(frame, states, {e.track_id for e in active if e.type == AlertType.FORWARD_COLLISION})
             if writer is not None:
                 writer.write(draw(img, frame, states, active, cfg.ego_lane.polygon))
             idx += 1
@@ -112,15 +116,32 @@ def main(argv: list[str] | None = None) -> int:
             args.video, events, args.out / "clips", fps, idx, cfg.output.clip_pre_s, cfg.output.clip_post_s
         )
 
-    video_meta = {"path": str(args.video), "fps": fps, "width": width, "height": height, "frames_processed": idx}
+    classes_file = Path(cfg.detector.classes_file)
+    doc = build_document(
+        cfg,
+        classes_version=load_classes_version(classes_file),
+        class_names=load_classes(classes_file),
+        detector_classes=set(tracker.label_map.values()),
+        video=Video(
+            path=str(args.video),
+            duration_s=round(idx / fps, 3),
+            fps=fps,
+            frames_processed=idx,
+            width=width,
+            height=height,
+        ),
+        events=events,
+        trip=trip,
+        clips=clips,
+    )
+    write_document(args.out / "events.json", doc)
+
     run_meta = {
         "weights": cfg.detector.weights,
         "coco_mapped": tracker.uses_coco,
         "config": str(args.config),
         "device": cfg.detector.device or "auto",
     }
-    write_events(args.out / "events.json", events, video_meta, run_meta, clips)
-
     summary = {
         "schema_version": SCHEMA_VERSION,
         "frames": idx,

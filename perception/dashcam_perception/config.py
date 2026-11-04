@@ -37,6 +37,7 @@ class CameraConfig:
     horizontal_fov_deg: float
     mount_height_m: float
     horizon_y_frac: float
+    calibrated: bool = False
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,7 @@ def parse_config(data: dict[str, Any], known_classes: list[str] | None = None) -
         horizontal_fov_deg=fov,
         mount_height_m=_positive(_req(c, "mount_height_m", "camera"), "camera.mount_height_m"),
         horizon_y_frac=_fraction(_req(c, "horizon_y_frac", "camera"), "camera.horizon_y_frac"),
+        calibrated=bool(c.get("calibrated", False)),
     )
 
     e = _req(data, "ego_lane", "")
@@ -255,6 +257,12 @@ def load_classes(path: Path) -> list[str]:
     if ids != list(range(len(ids))):
         raise ConfigError(f"{path}: class ids must be 0..N-1 without gaps, got {ids}")
     return [str(raw[i] if i in raw else raw[str(i)]) for i in ids]
+
+
+def load_classes_version(path: Path) -> int:
+    """`version` of configs/classes.yaml, echoed into events.json as classes_version."""
+    data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    return int(data["version"])
 
 
 def load_config(path: Path = DEFAULT_CONFIG) -> PipelineConfig:

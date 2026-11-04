@@ -7,9 +7,11 @@ from conftest import CLASSES, REPO
 from dashcam_perception.alerts import AlertEngine
 from dashcam_perception.config import ConfigError
 from dashcam_perception.detector import build_label_map
-from dashcam_perception.events import SCHEMA_VERSION, write_events
+from dashcam_perception.events import build_document, write_document
 from dashcam_perception.geometry import focal_length_px
 from dashcam_perception.scene import SceneEstimator, suppress_riders
+from dashcam_perception.schema import SCHEMA_VERSION, Video
+from dashcam_perception.summary import TripAccumulator
 from dashcam_perception.types import Box, FrameInfo, TrackedObject
 
 COCO_MAP = yaml.safe_load((REPO / "ml" / "configs" / "coco_map.yaml").read_text(encoding="utf-8"))
@@ -55,7 +57,7 @@ def project_car(x_m: float, z_m: float, cfg, w: int = 1280, h: int = 720) -> tup
     return max(0.0, x1), max(0.0, top), min(w - 1.0, x2), min(h - 1.0, bottom)
 
 
-def run_track(cfg, x_m: float, z0: float, speed: float, frames: int, cls: str = "car"):
+def run_track(cfg, x_m: float, z0: float, speed: float, frames: int, cls: str = "car", trip=None):
     fps = 30.0
     scene, engine = SceneEstimator(cfg), AlertEngine(cfg.alerts)
     for i in range(frames):
@@ -64,7 +66,10 @@ def run_track(cfg, x_m: float, z0: float, speed: float, frames: int, cls: str = 
         if box[2] <= box[0]:
             break  # left the frame
         f = FrameInfo(i, i / fps, 1280, 720)
-        engine.step(f, scene.step(f, [obj(5, cls, box)]))
+        states = scene.step(f, [obj(5, cls, box)])
+        active = engine.step(f, states)
+        if trip is not None:
+            trip.step(f, states, {e.track_id for e in active if e.type == "forward_collision"})
     return engine.finish()
 
 
@@ -80,13 +85,44 @@ def test_approaching_car_end_to_end_without_model(cfg, tmp_path):
     true_ttc_at_start = (60.0 - 10.0 * e.start_time_s) / 10.0
     assert true_ttc_at_start >= cfg.alerts.forward_collision.ttc_warning_s - 0.5
 
+
+def test_events_document_v1_end_to_end(cfg, tmp_path):
+    """Approaching car -> events.json v1 that validates and carries a trip summary."""
+    trip = TripAccumulator(cfg.alerts.forward_collision, frame_dt_s=1 / 30)
+    events = run_track(cfg, x_m=0.0, z0=60.0, speed=10.0, frames=175, trip=trip)
+    doc = build_document(
+        cfg,
+        classes_version=1,
+        class_names=CLASSES,
+        detector_classes={"car", "bus", "truck", "two_wheeler", "pedestrian", "animal"},  # COCO-mapped
+        video=Video(path="synthetic.mp4", duration_s=175 / 30, fps=30, frames_processed=175, width=1280, height=720),
+        events=events,
+        trip=trip,
+        clips={events[0].event_id: "clips/event_0001.mp4"},
+    )
     out = tmp_path / "events.json"
-    write_events(out, events, {"path": "synthetic"}, {"weights": "none"}, {e.event_id: "clips/x.mp4"})
-    doc = json.loads(out.read_text())
-    assert doc["schema_version"] == SCHEMA_VERSION
-    assert doc["events"][0]["type"] == "forward_collision"
-    assert doc["events"][0]["clip"] == "clips/x.mp4"
-    assert doc["events"][0]["gps"] is None
+    write_document(out, doc)
+    d = json.loads(out.read_text())
+    assert d["schema_version"] == SCHEMA_VERSION == "1.0"
+    e = d["events"][0]
+    assert e["type"] == "forward_collision" and e["clip"] == "clips/event_0001.mp4" and e["gps"] is None
+    assert e["distance_confidence"] == "low"  # default camera is uncalibrated
+    ts = d["trip_summary"]
+    assert ts["event_counts"]["forward_collision"]["critical"] == 1
+    assert ts["event_counts"]["tailgating"] == {"warning": 0, "critical": 0}
+    assert ts["checks"] == {
+        "forward_collision": "ran",
+        "obstacle_in_lane": "absent",  # COCO model can't see potholes etc.
+        "tailgating": "skipped_no_ego_speed",
+        "harsh_braking": "skipped_no_ego_speed",
+        "gps": "skipped_no_gps",
+    }
+    # Car becomes "TTC <= 4 s" at t = 2 s and the clip ends at t = 5.8 s: ~3.8 s of risky time
+    assert 3.0 <= ts["ttc_below_warning_s"] <= 4.0
+    assert ts["ttc_below_critical_s"] < ts["ttc_below_warning_s"]
+    assert d["objects_seen"]["car"] == 1 and d["objects_seen"]["bus"] == 0
+    assert set(d["objects_seen"]) == set(CLASSES)
+    assert d["hazards"] == []
 
 
 def test_car_in_next_lane_never_alerts(cfg):

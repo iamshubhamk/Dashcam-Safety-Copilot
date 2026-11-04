@@ -7,6 +7,7 @@ requires-python = ">=3.11,<3.14"
 # so the unit tests run without PyTorch.
 dependencies = [
     "numpy==2.3.5",
+    "pydantic==2.12.5",  # events.json v1 models (shared with the backend)
     "pyyaml==6.0.3",
 ]
 

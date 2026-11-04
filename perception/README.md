@@ -24,7 +24,7 @@ Outputs in `--out`:
 
 | file | what |
 |---|---|
-| `events.json` | one entry per alert episode (draft schema `0.1-draft`, see `events.py`) |
+| `events.json` | alert events, trip summary, hazards, objects seen (schema v1, see below) |
 | `annotated.mp4` | lane area, boxes, `~distance` and TTC labels, alert banner |
 | `clips/event_NNNN.mp4` | 5 s before the alert to 5 s after it ends |
 | `run_summary.json` | frames, end-to-end FPS, event counts by type and severity |
@@ -32,6 +32,25 @@ Outputs in `--out`:
 Before the fine-tuned model exists, the stock COCO model (`yolo26s.pt`) is used and its
 labels are mapped with `ml/configs/coco_map.yaml`. COCO has no auto-rickshaw or road
 obstacles, so obstacle alerts can't fire until the fine-tuned model is plugged in.
+
+## events.json (schema v1)
+
+The contract with the backend and dashboard, agreed with the architecture thread. The pydantic
+models in [`dashcam_perception/schema.py`](dashcam_perception/schema.py) are the source of truth;
+[`schema/events.v1.json`](schema/events.v1.json) is the exported JSON Schema for other languages.
+After changing a model, run `python -m dashcam_perception.schema` from the repo root (a test
+fails if the file is stale).
+
+- `events`: one per alert episode (type, severity, times, closest TTC and distance, clip).
+  `distance_confidence` is `"low"` until `camera.calibrated: true` in the config.
+- `trip_summary`: seconds spent with a confirmed forward-collision risk at TTC below the
+  warning/critical thresholds, the trip's closest call (`min_ttc_s`), event counts (zero-filled),
+  and `checks`, which says what ran and what was skipped (no speed, no GPS, or a class the
+  model can't see) so the report never implies "all clear" for something it didn't check.
+  Only confirmed alerts count, so a one-frame glitch can't set the closest call.
+- `hazards`: one per tracked pothole/barricade/speed breaker/debris, for the hazard map.
+- `objects_seen`: unique tracks per class. A tracker can split one vehicle into two ids after a
+  long occlusion, so treat these as approximate counts.
 
 ## How it decides (and why)
 
