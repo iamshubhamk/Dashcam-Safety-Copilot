@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/config.py -> repo root. Perception and configs/ resolve paths from here.
@@ -44,6 +45,14 @@ class Settings(BaseSettings):
 
     # A worker that hasn't sent a heartbeat for this long makes /healthz report "degraded".
     worker_heartbeat_max_age_s: float = 120.0
+
+    @field_validator("storage_dir", "work_dir", "risk_config")
+    @classmethod
+    def _absolute(cls, v: Path) -> Path:
+        # Relative paths are taken from the directory you start the API/worker in, and made absolute
+        # here. Perception runs with cwd=REPO_ROOT, so a relative path handed to it would point
+        # somewhere else ("video not found").
+        return v.expanduser().resolve()
 
 
 @lru_cache
