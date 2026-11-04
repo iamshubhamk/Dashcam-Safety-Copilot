@@ -270,19 +270,35 @@ const NOT_CHECKED_NO_SPEED = [
 ];
 
 const reportBase = {
-  exposure_unit: "hour",
+  exposure_unit: "per_hour",
   scoring_version: 1,
-  breakdown: {},
 } as const;
+
+/** report.breakdown.trip as the backend builds it from events.json trip_summary. */
+function breakdownFrom(doc: EventsDocument, videoCodec: string) {
+  return {
+    trip: {
+      ttc_below_warning_s: doc.trip_summary.ttc_below_warning_s,
+      ttc_below_critical_s: doc.trip_summary.ttc_below_critical_s,
+      min_ttc_s: doc.trip_summary.min_ttc_s,
+      objects_seen: doc.objects_seen,
+      gps: doc.trip_summary.checks.gps,
+      thresholds: doc.thresholds,
+      classes_version: doc.classes_version,
+      video_codec: videoCodec,
+    },
+  };
+}
 
 export const seedReports: Record<string, Report> = {
   [DEMO_TRIP_1]: {
     ...reportBase,
     trip_id: DEMO_TRIP_1,
+    breakdown: breakdownFrom(docWithGps, "h264"),
     score: 68,
     risk_rate: 41.5,
     exposure_value: 0.087,
-    provisional: false,
+    provisional: true,
     feedback: [
       {
         kind: "issue",
@@ -304,6 +320,7 @@ export const seedReports: Record<string, Report> = {
   [DEMO_TRIP_2]: {
     ...reportBase,
     trip_id: DEMO_TRIP_2,
+    breakdown: breakdownFrom(docNoGps, "mp4v"),
     score: 94,
     risk_rate: 0,
     exposure_value: 0.051,
@@ -313,7 +330,7 @@ export const seedReports: Record<string, Report> = {
       ...NOT_CHECKED_NO_SPEED,
       {
         type: "gps",
-        label: "Location (GPS)",
+        label: "Map positions",
         status: "skipped_no_gps",
         reason: "No GPS file was uploaded, so hazards from this trip are not on the map.",
       },

@@ -14,6 +14,7 @@ import {
   formatTimestamp,
   formatTtc,
 } from "../lib/display";
+import { mayNotPlay, readTripBreakdown } from "../lib/breakdown";
 
 export function TripReportPage() {
   const { id = "" } = useParams();
@@ -108,6 +109,7 @@ export function TripReportPage() {
 }
 
 function ReportBody({ trip, report, events }: { trip: Trip; report: Report; events: TripEvent[] }) {
+  const bd = readTripBreakdown(report.breakdown);
   const [selectedId, setSelectedId] = useState<number | null>(events[0]?.id ?? null);
   const selected = events.find((e) => e.id === selectedId) ?? null;
   const eventsById = new Map(events.map((e) => [e.id, e]));
@@ -127,7 +129,7 @@ function ReportBody({ trip, report, events }: { trip: Trip; report: Report; even
         {scoreCard("lg:hidden")}
         <Card title="Video">
           <div id="video-panel">
-            <VideoPanel trip={trip} selected={selected} />
+            <VideoPanel trip={trip} selected={selected} codecWarning={mayNotPlay(bd.video_codec)} />
           </div>
         </Card>
         <Card title={`Risky moments (${events.length})`}>
@@ -166,9 +168,27 @@ function ReportBody({ trip, report, events }: { trip: Trip; report: Report; even
             <dt className="text-slate-500">Critical</dt>
             <dd>{events.filter((e) => e.severity === "critical").length}</dd>
             <dt className="text-slate-500">Closest time-to-collision</dt>
-            <dd>{formatTtc(minOrNull(events.map((e) => e.min_ttc_s)))}</dd>
+            <dd>{formatTtc(bd.min_ttc_s ?? minOrNull(events.map((e) => e.min_ttc_s)))}</dd>
+            {bd.thresholds && bd.ttc_below_warning_s !== null && (
+              <>
+                <dt className="text-slate-500">Time under {bd.thresholds.ttc_warning_s} s TTC</dt>
+                <dd>{bd.ttc_below_warning_s.toFixed(1)} s</dd>
+              </>
+            )}
+            {bd.thresholds && bd.ttc_below_critical_s !== null && (
+              <>
+                <dt className="text-slate-500">Time under {bd.thresholds.ttc_critical_s} s TTC</dt>
+                <dd>{bd.ttc_below_critical_s.toFixed(1)} s</dd>
+              </>
+            )}
           </dl>
         </Card>
+
+        {Object.keys(bd.objects_seen).length > 0 && (
+          <Card title="Seen on the road">
+            <ObjectsSeen counts={bd.objects_seen} />
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -202,7 +222,7 @@ function ScoreCard({
           )}
           {report.provisional && report.score !== null && (
             <p className="mt-1 text-xs text-amber-800">
-              Provisional: the trip was short or several checks didn't run, so treat this score as rough.
+              Score not calibrated yet: the scoring weights haven't been tuned on real trips, so treat it as a rough guide.
             </p>
           )}
         </div>
@@ -212,7 +232,7 @@ function ScoreCard({
   );
 }
 
-function VideoPanel({ trip, selected }: { trip: Trip; selected: TripEvent | null }) {
+function VideoPanel({ trip, selected, codecWarning }: { trip: Trip; selected: TripEvent | null; codecWarning: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   const clipUrl = selected ? api.clipUrl(selected) : null;
   const fullUrl = api.videoUrl(trip);
@@ -236,6 +256,12 @@ function VideoPanel({ trip, selected }: { trip: Trip; selected: TripEvent | null
   }
   return (
     <div>
+      {codecWarning && (
+        <p className="mb-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          This video was saved in a format (mp4v) most browsers can't play. If it stays black, download it and open it
+          in a desktop player such as VLC.
+        </p>
+      )}
       <video key={src} ref={ref} src={src} controls playsInline preload="metadata" className="aspect-video w-full rounded-lg bg-black">
         Your browser can't play this video.
       </video>
@@ -334,5 +360,29 @@ function FeedbackList({
         );
       })}
     </ul>
+  );
+}
+
+function ObjectsSeen({ counts }: { counts: Record<string, number> }) {
+  const rows = Object.entries(counts)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (rows.length === 0) return <p className="text-sm text-slate-600">Nothing was tracked.</p>;
+  const max = rows[0]![1];
+  return (
+    <>
+      <ul className="space-y-1.5">
+        {rows.map(([name, n]) => (
+          <li key={name} className="grid grid-cols-[7rem_1fr_2.5rem] items-center gap-2 text-sm">
+            <span className="truncate">{classLabel(name)}</span>
+            <span className="h-2 rounded-full bg-slate-100">
+              <span className="block h-2 rounded-full bg-brand-600/70" style={{ width: `${(n / max) * 100}%` }} />
+            </span>
+            <span className="text-right tabular-nums text-slate-600">{n}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-slate-500">Unique objects tracked, not frames.</p>
+    </>
   );
 }

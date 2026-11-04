@@ -16,7 +16,7 @@ export const CHECK_LABELS: Record<CheckKey, string> = {
   obstacle_in_lane: "Obstacles in your lane",
   tailgating: "Tailgating",
   harsh_braking: "Harsh braking ahead",
-  gps: "Location (GPS)",
+  gps: "Map positions",
 };
 
 export const HAZARD_LABELS: Record<HazardClass, string> = {

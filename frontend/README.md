@@ -73,5 +73,7 @@ shows what to update.
 - Map tiles come from the public OpenStreetMap servers, which are fine for a demo but have a
   usage policy; switch the `TileLayer` URL for heavier use.
 - No marker clustering yet; add it if a map ever shows hundreds of hazards.
-- The report doesn't show "objects seen" or time spent under the TTC thresholds yet,
-  because API v1 doesn't return them.
+- Trip stats (objects seen, time under TTC thresholds, video codec) come from
+  `report.breakdown.trip`, which the OpenAPI types as a plain dict; `src/lib/breakdown.ts`
+  reads it defensively. Videos saved as mp4v get a "may not play" note.
+- No UI yet for `POST /trips/import` (uploading a results zip from a Kaggle run).

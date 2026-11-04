@@ -111,7 +111,7 @@ export interface Trip {
   id: string;
   label: string | null;
   status: TripStatus;
-  /** "upload" or "import" (results bundle from Kaggle) */
+  /** "upload" or "imported" (results bundle from Kaggle) */
   source: string;
   original_filename: string | null;
   duration_s: number | null;
@@ -174,7 +174,7 @@ export interface Report {
   risk_rate: number | null;
   exposure_unit: string;
   exposure_value: number;
-  /** True when too little was checked (or the trip is too short) for the score to mean much */
+  /** True while scoring weights aren't calibrated (always true for now) */
   provisional: boolean;
   scoring_version: number;
   breakdown: Record<string, unknown>;
@@ -212,4 +212,18 @@ export interface UploadInput {
 export interface ApiErrorBody {
   code: string;
   message: string;
+}
+
+/**
+ * report.breakdown.trip. The OpenAPI types breakdown as a plain dict, so this shape comes from
+ * backend/api-for-dashboard.md and is read defensively with readTripBreakdown().
+ */
+export interface TripBreakdown {
+  ttc_below_warning_s: number | null;
+  ttc_below_critical_s: number | null;
+  min_ttc_s: number | null;
+  objects_seen: Record<string, number>;
+  thresholds: { ttc_warning_s: number; ttc_critical_s: number } | null;
+  /** "h264" plays everywhere; "mp4v" usually doesn't play in browsers */
+  video_codec: string | null;
 }
