@@ -18,6 +18,13 @@ python -m dashcam_perception.run --video x.mp4 --out out/x --weights weights/bes
 pytest perception                              # unit tests, no GPU or weights needed
 ```
 
+Install [ffmpeg](https://ffmpeg.org/download.html) and put it on PATH (on Windows, e.g. `winget install ffmpeg`)
+so the annotated video and clips are converted to H.264, which browsers can play. Without it they stay
+MPEG-4 Part 2 and the run prints a warning; `run_summary.json` records `video_codec`.
+
+Exit codes: `0` success; `2` permanent failure (bad config, missing or unreadable video), so don't
+retry; anything else (e.g. GPU out of memory) may work on retry. The backend worker relies on this.
+
 Useful flags: `--device cpu`, `--no-video` (skip drawing, faster), `--no-clips`, `--max-frames 300`.
 
 Outputs in `--out`:

@@ -5,6 +5,13 @@ Run from the repo root (config paths are relative to it). Writes:
   out/annotated.mp4    video with lane, boxes, distance/TTC and alert banners
   out/clips/           ~5 s before/after each event
   out/run_summary.json frames, processing FPS, event counts (script-produced numbers)
+
+Videos are H.264 (browser-playable) when ffmpeg is on PATH, otherwise mp4v with a warning.
+
+Exit codes (the backend worker relies on these):
+  0  success
+  2  permanent failure: bad config, missing or unreadable video. Retrying won't help.
+  any other non-zero (uncaught exception, e.g. GPU out of memory): may succeed on retry.
 """
 
 from __future__ import annotations
@@ -19,6 +26,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from dashcam_perception.alerts import AlertEngine, AlertType
+from dashcam_perception.browser_video import ffmpeg_path, to_browser_h264
 from dashcam_perception.config import DEFAULT_CONFIG, ConfigError, load_classes, load_classes_version, load_config
 from dashcam_perception.events import build_document, write_document
 from dashcam_perception.scene import SceneEstimator, suppress_riders
@@ -116,6 +124,19 @@ def main(argv: list[str] | None = None) -> int:
             args.video, events, args.out / "clips", fps, idx, cfg.output.clip_pre_s, cfg.output.clip_post_s
         )
 
+    # Browser-playable output (H.264) when ffmpeg is available; see browser_video.py.
+    ffmpeg = ffmpeg_path()
+    videos = [args.out / "annotated.mp4"] if writer is not None else []
+    videos += [args.out / c for c in clips.values()]
+    converted = [to_browser_h264(v, ffmpeg) for v in videos]
+    video_codec = "h264" if videos and all(converted) else ("mp4v" if videos else None)
+    if video_codec == "mp4v":
+        print(
+            "warning: ffmpeg not found or failed; videos are MPEG-4 Part 2 (mp4v), which browsers "
+            "won't play. Install ffmpeg and re-run for H.264.",
+            file=sys.stderr,
+        )
+
     classes_file = Path(cfg.detector.classes_file)
     doc = build_document(
         cfg,
@@ -151,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         "pipeline_fps": round(idx / elapsed, 2) if elapsed > 0 else None,
         "events_by_type": dict(Counter(str(e.type) for e in events)),
         "events_by_severity": dict(Counter(str(e.severity) for e in events)),
+        "video_codec": video_codec,
         "machine": {"platform": platform.platform(), "python": platform.python_version()},
         **run_meta,
     }
