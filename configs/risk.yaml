@@ -1,0 +1,42 @@
+# Driving score configuration. Read by backend/app/services/scoring.py.
+# Bump `version` whenever a number changes: every report stores the version it was scored with,
+# so old reports stay explainable.
+#
+# How the score works (see backend/README.md for the full explanation):
+#   weight(event) = type_weight * severity_multiplier
+#   R             = sum of weights / exposure      (per 100 km with GPS, else per hour of video)
+#   score         = 100 * 0.5 ** (R / r_half)      (100 = no risky moments, 50 when R == r_half)
+#
+# These starting values are judgment calls, not research results.
+version: 1
+
+type_weights:
+  forward_collision: 3.0   # closest to an actual crash
+  obstacle_in_lane: 2.0    # damage risk, often avoidable
+  tailgating: 1.5          # habit-level risk, frequent
+  harsh_braking: 1.0       # lead vehicle braked hard; often not our driver's fault
+
+severity_multipliers:
+  warning: 1.0
+  critical: 3.0            # a critical episode counts as three warnings
+
+# Risk rate that gives a score of 50. PROVISIONAL: not yet calibrated on real footage.
+# While `provisional` is true every report says so. Calibrate by running a set of real trips
+# and choosing r_half so that a typical careful drive scores about 80.
+r_half:
+  per_100_km: 10.0
+  per_hour: 10.0
+provisional: true
+
+# Use per-100-km only when the GPS track covers at least this much; short or broken
+# tracks fall back to per-hour.
+min_distance_km: 1.0
+# Exposure floor: a 2-minute clip with one warning would otherwise look like 30 warnings per hour.
+min_exposure_hours: 0.25
+
+feedback:
+  max_worst_moments: 3
+  # "Most risky moments came in the first/middle/last third" fires when one third holds at
+  # least this share of the trip's weight and the trip has at least `cluster_min_events` events.
+  cluster_share: 0.6
+  cluster_min_events: 3
