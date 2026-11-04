@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { Trip } from "../api/types";
@@ -12,11 +12,14 @@ export const pollWhileBusy = (trips: Trip[] | undefined): number | false =>
   trips?.some((t) => t.status === "queued" || t.status === "processing") ? POLL_MS : false;
 
 export function TripsPage() {
-  const { data, error, isLoading } = useQuery({
+  const { data, error, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["trips"],
-    queryFn: api.listTrips,
-    refetchInterval: (q) => pollWhileBusy(q.state.data),
+    queryFn: ({ pageParam }) => api.listTrips(pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor,
+    refetchInterval: (q) => pollWhileBusy(q.state.data?.pages.flatMap((p) => p.items)),
   });
+  const trips = data?.pages.flatMap((p) => p.items);
 
   return (
     <div className="space-y-4">
@@ -29,7 +32,7 @@ export function TripsPage() {
 
       {isLoading && <Loading what="trips" />}
       {error && <ErrorBox error={error} />}
-      {data && data.length === 0 && (
+      {trips && trips.length === 0 && (
         <Card>
           <p className="text-sm text-slate-600">
             No trips yet. <Link className="text-brand-600 underline" to="/upload">Upload a dashcam video</Link> to get a
@@ -38,21 +41,31 @@ export function TripsPage() {
         </Card>
       )}
 
-      {data && data.length > 0 && (
+      {trips && trips.length > 0 && (
         <ul className="space-y-2">
-          {data.map((trip) => (
+          {trips.map((trip) => (
             <li key={trip.id}>
               <TripRow trip={trip} />
             </li>
           ))}
         </ul>
       )}
+      {hasNextPage && (
+        <button
+          type="button"
+          onClick={() => fetchNextPage()}
+          disabled={isFetchingNextPage}
+          className="w-full rounded-md border border-slate-200 bg-white py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {isFetchingNextPage ? "Loading…" : "Show older trips"}
+        </button>
+      )}
     </div>
   );
 }
 
 function TripRow({ trip }: { trip: Trip }) {
-  const title = trip.label ?? trip.original_filename;
+  const title = trip.label ?? trip.original_filename ?? "Imported trip";
   const created = new Date(trip.created_at).toLocaleString();
   return (
     <Link
@@ -70,10 +83,10 @@ function TripRow({ trip }: { trip: Trip }) {
         {trip.status === "failed" && trip.error && <p className="mt-1 text-xs text-red-700">{trip.error}</p>}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <StatusPill status={trip.status} progress={trip.progress} />
+        <StatusPill status={trip.status} />
         {trip.status === "done" && (
           <span className="text-xs text-slate-500">
-            {trip.event_count === 1 ? "1 risky moment" : `${trip.event_count ?? 0} risky moments`}
+            {trip.event_count === 1 ? "1 risky moment" : `${trip.event_count} risky moments`}
           </span>
         )}
         {trip.status === "done" && !trip.has_gps && <span className="text-xs text-slate-400">no GPS</span>}

@@ -1,7 +1,7 @@
 import Ajv2020 from "ajv/dist/2020";
 import schema from "../api/events.v1.schema.json";
 import { EVENT_TYPES } from "../api/types";
-import { docNoGps, docWithGps, seedReports } from "./fixtures";
+import { docNoGps, docWithGps, seedEvents, seedTrips } from "./fixtures";
 
 // Keeps the demo data honest: it must be a valid events.json v1 document,
 // exactly as perception would write it.
@@ -23,11 +23,9 @@ describe("mock events documents", () => {
     }
   });
 
-  it("report event totals match the events list", () => {
-    for (const report of Object.values(seedReports)) {
-      const counts = report.events_doc.trip_summary.event_counts;
-      const total = Object.values(counts).reduce((s, c) => s + (c.warning ?? 0) + (c.critical ?? 0), 0);
-      expect(total).toBe(report.events_doc.events.length);
+  it("trip event counts match the events list", () => {
+    for (const trip of seedTrips) {
+      expect(seedEvents[trip.id]?.length ?? 0).toBe(trip.event_count);
     }
   });
 });

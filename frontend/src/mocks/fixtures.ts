@@ -2,10 +2,11 @@
  * DEMO DATA. Hand-written to exercise every UI state; none of it came from a real video.
  * The UI shows a "Demo data" banner whenever these are in use.
  *
- * Every EventsDocument here is validated against events.v1.schema.json in
- * src/mocks/fixtures.test.ts, so if the perception contract changes, that test fails.
+ * The EventsDocuments are validated against events.v1.schema.json (fixtures.test.ts), and the
+ * API responses built from them against openapi.v1.json (api/openapi.contract.test.ts), so a
+ * change on either side makes a test fail.
  */
-import type { EventsDocument, MapHazard, Trip, TripReport } from "../api/types";
+import type { EventsDocument, MapHazard, Report, Trip, TripEvent } from "../api/types";
 
 const ZERO_COUNTS = {
   forward_collision: { warning: 0, critical: 0 },
@@ -162,77 +163,167 @@ export const docNoGps: EventsDocument = {
   objects_seen: { ...OBJECTS_ZERO, car: 31, truck: 14, two_wheeler: 22, bus: 3, debris: 1 },
 };
 
+export const DEMO_TRIP_1 = "0b6f3c1e-5d4a-4c1f-9a51-2f0c7d1e8a01";
+export const DEMO_TRIP_2 = "0b6f3c1e-5d4a-4c1f-9a51-2f0c7d1e8a02";
+export const DEMO_TRIP_3 = "0b6f3c1e-5d4a-4c1f-9a51-2f0c7d1e8a03";
+
+/** Flatten events.json events the way the backend does (GET /trips/{id}/events). */
+export function toTripEvents(tripId: string, doc: EventsDocument, idOffset: number): TripEvent[] {
+  return doc.events.map((e) => ({
+    id: idOffset + e.event_id,
+    trip_id: tripId,
+    type: e.type,
+    severity: e.severity,
+    class_name: e.class_name,
+    track_id: e.track_id,
+    start_s: e.start_time_s,
+    end_s: e.end_time_s,
+    peak_s: e.peak_time_s,
+    min_ttc_s: e.min_ttc_s,
+    min_distance_m: e.min_distance_m,
+    distance_confidence: e.distance_confidence,
+    max_confidence: e.max_confidence,
+    lat: e.gps?.lat ?? null,
+    lon: e.gps?.lon ?? null,
+    has_clip: e.clip !== null,
+    metrics: {},
+  }));
+}
+
+const baseTrip = {
+  source: "upload",
+  has_original_video: true,
+  has_annotated_video: false,
+  error: null,
+} as const;
+
 export const seedTrips: Trip[] = [
   {
-    id: "demo-1",
+    ...baseTrip,
+    id: DEMO_TRIP_1,
     label: "Outer Ring Road, evening",
     original_filename: "demo_outer_ring_road.mp4",
     status: "done",
-    progress: null,
-    error: null,
-    created_at: "2026-11-03T13:20:00Z",
     duration_s: 312.4,
+    distance_km: 3.9,
     score: 68,
     has_gps: true,
     event_count: 3,
+    created_at: "2026-11-03T13:20:00Z",
+    processed_at: "2026-11-03T13:27:41Z",
   },
   {
-    id: "demo-2",
+    ...baseTrip,
+    id: DEMO_TRIP_2,
     label: null,
     original_filename: "demo_highway_morning.mp4",
     status: "done",
-    progress: null,
-    error: null,
-    created_at: "2026-11-02T03:05:00Z",
     duration_s: 184.0,
+    distance_km: null,
     score: 94,
     has_gps: false,
     event_count: 0,
+    created_at: "2026-11-02T03:05:00Z",
+    processed_at: "2026-11-02T03:09:12Z",
   },
   {
-    id: "demo-3",
+    ...baseTrip,
+    id: DEMO_TRIP_3,
     label: "Corrupted test file",
     original_filename: "broken.mp4",
     status: "failed",
-    progress: null,
-    error: "Could not read video: no decodable frames",
-    created_at: "2026-11-01T10:40:00Z",
     duration_s: null,
+    distance_km: null,
     score: null,
     has_gps: false,
-    event_count: null,
+    event_count: 0,
+    error: "Could not read video: no decodable frames",
+    created_at: "2026-11-01T10:40:00Z",
+    processed_at: "2026-11-01T10:40:09Z",
   },
 ];
 
-export const seedReports: Record<string, Omit<TripReport, "trip">> = {
-  "demo-1": {
-    score: 68,
-    feedback: [
-      { kind: "improve", text: "1 critical close approach (two-wheeler at 2:27). Leave more room in dense two-wheeler traffic." },
-      { kind: "improve", text: "About 10 s of the trip had a road user ahead closing in under 2.7 s." },
-      { kind: "good", text: "No warnings in the last minute of the trip." },
-      { kind: "info", text: "Tailgating and harsh braking were not checked: the video has no speed data." },
-    ],
-    annotated_video_url: null,
-    clip_urls: {},
-    events_doc: docWithGps,
+export const seedEvents: Record<string, TripEvent[]> = {
+  [DEMO_TRIP_1]: toTripEvents(DEMO_TRIP_1, docWithGps, 100),
+  [DEMO_TRIP_2]: toTripEvents(DEMO_TRIP_2, docNoGps, 200),
+};
+
+const NOT_CHECKED_NO_SPEED = [
+  {
+    type: "obstacle_in_lane",
+    label: "Obstacles in your lane",
+    status: "absent",
+    reason: "The current detection model can't see road obstacles yet.",
   },
-  "demo-2": {
-    score: 94,
+  {
+    type: "tailgating",
+    label: "Tailgating",
+    status: "skipped_no_ego_speed",
+    reason: "Needs your vehicle's speed, which this video doesn't have.",
+  },
+  {
+    type: "harsh_braking",
+    label: "Harsh braking ahead",
+    status: "skipped_no_ego_speed",
+    reason: "Needs your vehicle's speed, which this video doesn't have.",
+  },
+];
+
+const reportBase = {
+  exposure_unit: "hour",
+  scoring_version: 1,
+  breakdown: {},
+} as const;
+
+export const seedReports: Record<string, Report> = {
+  [DEMO_TRIP_1]: {
+    ...reportBase,
+    trip_id: DEMO_TRIP_1,
+    score: 68,
+    risk_rate: 41.5,
+    exposure_value: 0.087,
+    provisional: false,
     feedback: [
-      { kind: "good", text: "No close approaches detected on this trip." },
-      { kind: "info", text: "No GPS file was uploaded, so hazards from this trip are not on the map." },
-      { kind: "info", text: "Tailgating and harsh braking were not checked: the video has no speed data." },
+      {
+        kind: "issue",
+        text: "1 critical close approach to a two-wheeler. Leave more room in dense two-wheeler traffic.",
+        event_ids: [102],
+        type: "forward_collision",
+      },
+      {
+        kind: "pattern",
+        text: "About 10 s of the trip had a road user ahead closing in under 2.7 s.",
+        event_ids: [],
+        type: null,
+      },
+      { kind: "worst_moments", text: "Your closest calls on this trip.", event_ids: [102, 101], type: null },
+      { kind: "positive", text: "No warnings in the last minute of the trip.", event_ids: [], type: null },
     ],
-    annotated_video_url: null,
-    clip_urls: {},
-    events_doc: docNoGps,
+    not_checked: NOT_CHECKED_NO_SPEED,
+  },
+  [DEMO_TRIP_2]: {
+    ...reportBase,
+    trip_id: DEMO_TRIP_2,
+    score: 94,
+    risk_rate: 0,
+    exposure_value: 0.051,
+    provisional: true,
+    feedback: [{ kind: "positive", text: "No close approaches detected on this trip.", event_ids: [], type: null }],
+    not_checked: [
+      ...NOT_CHECKED_NO_SPEED,
+      {
+        type: "gps",
+        label: "Location (GPS)",
+        status: "skipped_no_gps",
+        reason: "No GPS file was uploaded, so hazards from this trip are not on the map.",
+      },
+    ],
   },
 };
 
 export const seedHazards: MapHazard[] = [
-  { id: "hz-1", class: "pothole", lat: 12.9318, lon: 77.6259, sightings: 3, trip_ids: ["demo-1"], last_seen_at: "2026-11-03T13:21:28Z" },
-  { id: "hz-2", class: "speed_breaker", lat: 12.9231, lon: 77.629, sightings: 1, trip_ids: ["demo-1"], last_seen_at: "2026-11-03T13:23:21Z" },
-  { id: "hz-3", class: "barricade", lat: 12.9411, lon: 77.6198, sightings: 2, trip_ids: ["demo-1"], last_seen_at: "2026-11-03T13:20:10Z" },
-  { id: "hz-4", class: "debris", lat: 12.9142, lon: 77.6335, sightings: 1, trip_ids: ["demo-1"], last_seen_at: "2026-11-03T13:24:40Z" },
+  { id: 1, hazard_class: "pothole", lat: 12.9318, lon: 77.6259, seen_count: 3, trip_count: 2, first_seen_at: "2026-10-28T09:10:00Z", last_seen_at: "2026-11-03T13:21:28Z" },
+  { id: 2, hazard_class: "speed_breaker", lat: 12.9231, lon: 77.629, seen_count: 1, trip_count: 1, first_seen_at: "2026-11-03T13:23:21Z", last_seen_at: "2026-11-03T13:23:21Z" },
+  { id: 3, hazard_class: "barricade", lat: 12.9411, lon: 77.6198, seen_count: 2, trip_count: 1, first_seen_at: "2026-11-03T13:20:05Z", last_seen_at: "2026-11-03T13:20:10Z" },
+  { id: 4, hazard_class: "debris", lat: 12.9142, lon: 77.6335, seen_count: 1, trip_count: 1, first_seen_at: "2026-11-03T13:24:40Z", last_seen_at: "2026-11-03T13:24:40Z" },
 ];

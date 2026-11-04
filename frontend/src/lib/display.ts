@@ -2,15 +2,7 @@
  * Display rules for report data. Kept as plain functions so they are unit-tested
  * (src/lib/display.test.ts) instead of buried in JSX.
  */
-import type {
-  CheckKey,
-  CheckStatus,
-  EventType,
-  HazardClass,
-  SafetyEvent,
-  Severity,
-  TripSummary,
-} from "../api/types";
+import { EVENT_TYPES, type CheckKey, type EventType, type HazardClass, type NotChecked, type Severity, type TripEvent } from "../api/types";
 
 export const EVENT_LABELS: Record<EventType, string> = {
   forward_collision: "Forward collision risk",
@@ -50,41 +42,41 @@ export const CLASS_LABELS: Record<string, string> = {
 
 export const classLabel = (name: string): string => CLASS_LABELS[name] ?? name.replaceAll("_", " ");
 
-export interface CheckView {
+export interface CheckRow {
+  type: string;
+  label: string;
   checked: boolean;
-  label: "Checked" | "Not checked";
+  /** Why it wasn't checked (from the backend); null when checked */
   reason: string | null;
 }
 
 /**
- * Only "ran" counts as checked. Every other status means the pipeline could not look, so
- * the UI must say "Not checked" and never imply a clean pass.
+ * Rows for "What we checked". The backend lists every check that did not run in
+ * `not_checked`; those always read "Not checked" with its reason, never as a clean pass.
+ * The 4 event checks are always shown; GPS is shown as checked when the trip has GPS.
  */
-export function checkView(status: CheckStatus): CheckView {
-  switch (status) {
-    case "ran":
-      return { checked: true, label: "Checked", reason: null };
-    case "skipped_no_ego_speed":
-      return { checked: false, label: "Not checked", reason: "Needs your vehicle's speed, which this video doesn't have." };
-    case "skipped_no_gps":
-      return { checked: false, label: "Not checked", reason: "No GPS file was uploaded with this video." };
-    case "absent":
-      return { checked: false, label: "Not checked", reason: "The current detection model doesn't support this yet." };
+export function checkRows(notChecked: NotChecked[], hasGps: boolean): CheckRow[] {
+  const skipped = new Map(notChecked.map((n) => [n.type, n]));
+  const rows: CheckRow[] = EVENT_TYPES.map((type) => {
+    const n = skipped.get(type);
+    return { type, label: n?.label ?? CHECK_LABELS[type], checked: !n, reason: n?.reason ?? null };
+  });
+  for (const n of notChecked) {
+    if (!(EVENT_TYPES as readonly string[]).includes(n.type)) {
+      rows.push({ type: n.type, label: n.label, checked: false, reason: n.reason });
+    }
   }
-}
-
-/** Count for one event type, or null when that check didn't run (show "not checked", not 0). */
-export function eventCount(summary: TripSummary, type: EventType): number | null {
-  if (summary.checks[type] !== "ran") return null;
-  const c = summary.event_counts[type];
-  return (c.warning ?? 0) + (c.critical ?? 0);
+  if (hasGps && !skipped.has("gps")) {
+    rows.push({ type: "gps", label: CHECK_LABELS.gps, checked: true, reason: null });
+  }
+  return rows;
 }
 
 /**
  * Monocular distance is an estimate. With distance_confidence "low" (uncalibrated camera,
  * 20-40% error) show it rounded with "≈" so nobody reads 9.4 m as precise.
  */
-export function formatDistance(event: Pick<SafetyEvent, "min_distance_m" | "distance_confidence">): string {
+export function formatDistance(event: Pick<TripEvent, "min_distance_m" | "distance_confidence">): string {
   const m = event.min_distance_m;
   if (m === null) return "—";
   if (event.distance_confidence === "low") return `≈ ${Math.round(m)} m`;

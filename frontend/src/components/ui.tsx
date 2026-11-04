@@ -51,12 +51,11 @@ const STATUS_LABELS: Record<TripStatus, string> = {
   failed: "Failed",
 };
 
-export function StatusPill({ status, progress }: { status: TripStatus; progress?: number | null }) {
-  const pct = status === "processing" && progress != null ? ` ${Math.round(progress * 100)}%` : "";
+export function StatusPill({ status }: { status: TripStatus }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}>
+      {status === "processing" && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600" aria-hidden />}
       {STATUS_LABELS[status]}
-      {pct}
     </span>
   );
 }

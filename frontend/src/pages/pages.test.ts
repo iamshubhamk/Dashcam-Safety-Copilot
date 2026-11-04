@@ -1,6 +1,6 @@
 import { pollWhileBusy } from "./TripsPage";
 import { MAX_VIDEO_BYTES, validateVideo } from "./UploadPage";
-import { boundsFor } from "./HazardMapPage";
+import { boundsFor, toBBox } from "./HazardMapPage";
 import { seedHazards, seedTrips } from "../mocks/fixtures";
 
 describe("trip list polling", () => {
@@ -26,6 +26,7 @@ describe("upload validation", () => {
 
 describe("hazard map bounds", () => {
   it("fits all hazards", () => {
+    expect(boundsFor([])).toBeNull();
     const [[s, w], [n, e]] = boundsFor(seedHazards) as [[number, number], [number, number]];
     for (const h of seedHazards) {
       expect(h.lat).toBeGreaterThanOrEqual(s);
@@ -33,5 +34,12 @@ describe("hazard map bounds", () => {
       expect(h.lon).toBeGreaterThanOrEqual(w);
       expect(h.lon).toBeLessThanOrEqual(e);
     }
+  });
+});
+
+describe("map bbox", () => {
+  it("orders west,south,east,north and rounds", () => {
+    const b = { getWest: () => 77.12345, getSouth: () => 12.9, getEast: () => 77.7, getNorth: () => 13.05 };
+    expect(toBBox(b)).toEqual([77.123, 12.9, 77.7, 13.05]);
   });
 });

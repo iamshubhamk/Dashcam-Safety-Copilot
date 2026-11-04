@@ -1,27 +1,30 @@
-import { checkView, eventCount, formatDistance, formatTimestamp, formatTtc, scoreBand } from "./display";
-import { docNoGps, docWithGps } from "../mocks/fixtures";
+import { checkRows, formatDistance, formatTimestamp, formatTtc, scoreBand } from "./display";
 
-describe("checkView", () => {
-  it("treats only 'ran' as checked", () => {
-    expect(checkView("ran")).toMatchObject({ checked: true, label: "Checked" });
-    for (const s of ["skipped_no_ego_speed", "skipped_no_gps", "absent"] as const) {
-      const v = checkView(s);
-      expect(v.checked).toBe(false);
-      expect(v.label).toBe("Not checked");
-      expect(v.reason).toBeTruthy();
+describe("checkRows", () => {
+  const notChecked = [
+    { type: "tailgating", label: "Tailgating", status: "skipped_no_ego_speed", reason: "No speed" },
+    { type: "obstacle_in_lane", label: "Obstacles", status: "absent", reason: "Model can't see them" },
+    { type: "gps", label: "Location (GPS)", status: "skipped_no_gps", reason: "No GPS file" },
+  ];
+
+  it("marks everything in not_checked as not checked, with the backend's reason", () => {
+    const rows = checkRows(notChecked, false);
+    for (const t of ["tailgating", "obstacle_in_lane", "gps"]) {
+      const row = rows.find((r) => r.type === t)!;
+      expect(row.checked).toBe(false);
+      expect(row.reason).toBeTruthy();
     }
   });
-});
 
-describe("eventCount", () => {
-  it("sums warning and critical for checks that ran", () => {
-    expect(eventCount(docWithGps.trip_summary, "forward_collision")).toBe(3);
-    expect(eventCount(docNoGps.trip_summary, "forward_collision")).toBe(0);
+  it("always lists all four event checks", () => {
+    const types = checkRows([], false).map((r) => r.type);
+    expect(types).toEqual(["forward_collision", "obstacle_in_lane", "tailgating", "harsh_braking"]);
   });
 
-  it("returns null (not 0) when the check did not run", () => {
-    expect(eventCount(docWithGps.trip_summary, "tailgating")).toBeNull();
-    expect(eventCount(docWithGps.trip_summary, "obstacle_in_lane")).toBeNull();
+  it("shows GPS as checked only when the trip has GPS and the backend didn't skip it", () => {
+    expect(checkRows([], true).find((r) => r.type === "gps")?.checked).toBe(true);
+    expect(checkRows(notChecked, true).find((r) => r.type === "gps")?.checked).toBe(false);
+    expect(checkRows([], false).find((r) => r.type === "gps")).toBeUndefined();
   });
 });
 

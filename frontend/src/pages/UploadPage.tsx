@@ -6,7 +6,7 @@ import { Card, ErrorBox } from "../components/ui";
 
 /** Matches the backend's upload cap. */
 export const MAX_VIDEO_BYTES = 2 * 1024 ** 3;
-const VIDEO_TYPES = ".mp4,.mov,.avi,.mkv,video/*";
+const VIDEO_TYPES = ".mp4,.mov,.m4v,.avi,.mkv,video/*";
 const GPS_TYPES = ".gpx,.csv";
 
 export function validateVideo(file: File | null): string | null {

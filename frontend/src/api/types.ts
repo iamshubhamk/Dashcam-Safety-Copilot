@@ -97,56 +97,119 @@ export interface EventsDocument {
   objects_seen: Record<string, number>;
 }
 
-// ---------- Part 2: API wrapper (proposal, backend owns the final OpenAPI) ----------
+// ---------- Part 2: backend API v1 (mirrors openapi.v1.json; the backend owns it) ----------
+// src/api/openapi.contract.test.ts validates the demo responses against the vendored spec.
 
 export type TripStatus = "queued" | "processing" | "done" | "failed";
 
+export interface Page<T> {
+  items: T[];
+  next_cursor: string | null;
+}
+
 export interface Trip {
   id: string;
-  /** Optional free-text label the user typed at upload */
   label: string | null;
-  original_filename: string;
   status: TripStatus;
-  /** 0-1 while processing, null when unknown */
-  progress: number | null;
-  error: string | null;
-  created_at: string;
+  /** "upload" or "import" (results bundle from Kaggle) */
+  source: string;
+  original_filename: string | null;
   duration_s: number | null;
+  distance_km: number | null;
+  has_gps: boolean;
+  has_original_video: boolean;
+  has_annotated_video: boolean;
   /** 0-100, computed by the backend from configs/risk.yaml; null until done */
   score: number | null;
-  has_gps: boolean;
-  event_count: number | null;
+  event_count: number;
+  error: string | null;
+  created_at: string;
+  processed_at: string | null;
 }
 
-export interface FeedbackItem {
-  kind: "good" | "improve" | "info";
+/** One risky moment, flattened from events.json by the backend. */
+export interface TripEvent {
+  id: number;
+  trip_id: string;
+  type: EventType;
+  severity: Severity;
+  class_name: string;
+  track_id: number;
+  start_s: number;
+  end_s: number;
+  peak_s: number;
+  min_ttc_s: number | null;
+  min_distance_m: number | null;
+  distance_confidence: "low" | "ok";
+  max_confidence: number;
+  lat: number | null;
+  lon: number | null;
+  has_clip: boolean;
+  metrics: Record<string, unknown>;
+}
+
+/** Known kinds; anything else is shown as a neutral note. */
+export type FeedbackKind = "issue" | "positive" | "pattern" | "worst_moments" | (string & {});
+
+export interface FeedbackLine {
+  kind: FeedbackKind;
   text: string;
+  /** Events this line is about; the UI links them to the clip player */
+  event_ids: number[];
+  type?: string | null;
 }
 
-export interface TripReport {
-  trip: Trip;
-  score: number;
-  feedback: FeedbackItem[];
-  /** URL of the full annotated video, or null if not rendered */
-  annotated_video_url: string | null;
-  /** event_id -> playable clip URL (H.264 MP4) */
-  clip_urls: Record<number, string>;
-  events_doc: EventsDocument;
+/** A check that did not run for this trip. Anything listed here must read "Not checked". */
+export interface NotChecked {
+  type: string;
+  label: string;
+  /** e.g. skipped_no_ego_speed, skipped_no_gps, absent */
+  status: string;
+  reason: string;
 }
 
-/** One hazard on the map, aggregated across trips (nearby sightings merged by the backend). */
+export interface Report {
+  trip_id: string;
+  score: number | null;
+  risk_rate: number | null;
+  exposure_unit: string;
+  exposure_value: number;
+  /** True when too little was checked (or the trip is too short) for the score to mean much */
+  provisional: boolean;
+  scoring_version: number;
+  breakdown: Record<string, unknown>;
+  feedback: FeedbackLine[];
+  not_checked: NotChecked[];
+}
+
 export interface MapHazard {
-  id: string;
-  class: HazardClass;
+  id: number;
+  hazard_class: HazardClass;
   lat: number;
   lon: number;
-  sightings: number;
-  trip_ids: string[];
+  seen_count: number;
+  trip_count: number;
+  first_seen_at: string;
   last_seen_at: string;
 }
+
+export interface HazardList {
+  items: MapHazard[];
+  /** True when the box held more hazards than the server returns; zoom in to see the rest */
+  truncated: boolean;
+}
+
+/** [west, south, east, north] in degrees */
+export type BBox = [number, number, number, number];
 
 export interface UploadInput {
   video: File;
   gps?: File | null;
   label?: string | null;
+}
+
+/** Backend error body */
+export interface ApiErrorBody {
+  code: string;
+  message: string;
 }
