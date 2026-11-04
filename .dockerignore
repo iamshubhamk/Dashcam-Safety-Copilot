@@ -1,0 +1,19 @@
+# Keep the build context small: no data, weights, venvs or node_modules.
+.git
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/node_modules
+**/dist
+data
+weights
+runs
+results
+ml
+*.pt
+*.onnx
+*.engine
+**/.env
