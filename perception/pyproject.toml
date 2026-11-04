@@ -1,0 +1,43 @@
+[project]
+name = "dashcam-perception"
+version = "0.1.0"
+description = "Video -> detections -> tracks -> distance/TTC -> alert events for the Dashcam Safety Copilot"
+requires-python = ">=3.11,<3.14"
+# Core deps cover config loading and all the maths (TTC, distance, ROI, alert rules),
+# so the unit tests run without PyTorch.
+dependencies = [
+    "numpy==2.3.5",
+    "pydantic==2.12.5",  # events.json v1 models (shared with the backend)
+    "pyyaml==6.0.3",
+]
+
+[project.optional-dependencies]
+# The actual pipeline: Ultralytics brings PyTorch, OpenCV and its ByteTrack implementation.
+# Same version as ml/ so weights trained there load here.
+run = [
+    "ultralytics==8.4.197",
+    "lap==0.5.13",  # ByteTrack's assignment solver; Ultralytics only auto-installs it at runtime
+]
+dev = [
+    "pytest==9.2.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["dashcam_perception*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dashcam_perception"]

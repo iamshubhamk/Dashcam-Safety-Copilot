@@ -1,0 +1,479 @@
+{
+  "$defs": {
+    "Checks": {
+      "additionalProperties": false,
+      "description": "What the pipeline did and didn't check, so the report never implies a clean bill of\nhealth for something it couldn't look at.",
+      "properties": {
+        "forward_collision": {
+          "enum": [
+            "ran",
+            "skipped_no_ego_speed",
+            "skipped_no_gps",
+            "absent"
+          ],
+          "title": "Forward Collision",
+          "type": "string"
+        },
+        "gps": {
+          "enum": [
+            "ran",
+            "skipped_no_ego_speed",
+            "skipped_no_gps",
+            "absent"
+          ],
+          "title": "Gps",
+          "type": "string"
+        },
+        "harsh_braking": {
+          "enum": [
+            "ran",
+            "skipped_no_ego_speed",
+            "skipped_no_gps",
+            "absent"
+          ],
+          "title": "Harsh Braking",
+          "type": "string"
+        },
+        "obstacle_in_lane": {
+          "enum": [
+            "ran",
+            "skipped_no_ego_speed",
+            "skipped_no_gps",
+            "absent"
+          ],
+          "title": "Obstacle In Lane",
+          "type": "string"
+        },
+        "tailgating": {
+          "enum": [
+            "ran",
+            "skipped_no_ego_speed",
+            "skipped_no_gps",
+            "absent"
+          ],
+          "title": "Tailgating",
+          "type": "string"
+        }
+      },
+      "required": [
+        "forward_collision",
+        "obstacle_in_lane",
+        "tailgating",
+        "harsh_braking",
+        "gps"
+      ],
+      "title": "Checks",
+      "type": "object"
+    },
+    "Event": {
+      "additionalProperties": false,
+      "properties": {
+        "class_name": {
+          "title": "Class Name",
+          "type": "string"
+        },
+        "clip": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Clip path relative to the output folder, if clips were written",
+          "title": "Clip"
+        },
+        "distance_confidence": {
+          "description": "'low' while the camera is uncalibrated: distances can be off by 20-40%",
+          "enum": [
+            "low",
+            "ok"
+          ],
+          "title": "Distance Confidence",
+          "type": "string"
+        },
+        "end_time_s": {
+          "minimum": 0,
+          "title": "End Time S",
+          "type": "number"
+        },
+        "event_id": {
+          "minimum": 1,
+          "title": "Event Id",
+          "type": "integer"
+        },
+        "gps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GPS"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_confidence": {
+          "description": "Highest detector confidence for this object",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Max Confidence",
+          "type": "number"
+        },
+        "min_distance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Closest monocular distance estimate during the episode",
+          "title": "Min Distance M"
+        },
+        "min_ttc_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lowest time-to-collision during the episode; null if never computed",
+          "title": "Min Ttc S"
+        },
+        "peak_box_xyxy": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Peak Box Xyxy",
+          "type": "array"
+        },
+        "peak_time_s": {
+          "minimum": 0,
+          "title": "Peak Time S",
+          "type": "number"
+        },
+        "severity": {
+          "enum": [
+            "warning",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "start_frame": {
+          "minimum": 0,
+          "title": "Start Frame",
+          "type": "integer"
+        },
+        "start_time_s": {
+          "minimum": 0,
+          "title": "Start Time S",
+          "type": "number"
+        },
+        "track_id": {
+          "title": "Track Id",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "forward_collision",
+            "obstacle_in_lane",
+            "tailgating",
+            "harsh_braking"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "type",
+        "severity",
+        "track_id",
+        "class_name",
+        "start_frame",
+        "start_time_s",
+        "end_time_s",
+        "peak_time_s",
+        "min_ttc_s",
+        "min_distance_m",
+        "distance_confidence",
+        "max_confidence",
+        "peak_box_xyxy",
+        "gps",
+        "clip"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "GPS": {
+      "additionalProperties": false,
+      "properties": {
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "lon": {
+          "title": "Lon",
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ],
+      "title": "GPS",
+      "type": "object"
+    },
+    "Hazard": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "enum": [
+            "pothole",
+            "barricade",
+            "speed_breaker",
+            "debris"
+          ],
+          "title": "Class",
+          "type": "string"
+        },
+        "first_seen_s": {
+          "minimum": 0,
+          "title": "First Seen S",
+          "type": "number"
+        },
+        "gps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GPS"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_seen_s": {
+          "minimum": 0,
+          "title": "Last Seen S",
+          "type": "number"
+        },
+        "track_id": {
+          "title": "Track Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "class",
+        "track_id",
+        "first_seen_s",
+        "last_seen_s",
+        "gps"
+      ],
+      "title": "Hazard",
+      "type": "object"
+    },
+    "Thresholds": {
+      "additionalProperties": false,
+      "properties": {
+        "ttc_critical_s": {
+          "exclusiveMinimum": 0,
+          "title": "Ttc Critical S",
+          "type": "number"
+        },
+        "ttc_warning_s": {
+          "exclusiveMinimum": 0,
+          "title": "Ttc Warning S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ttc_warning_s",
+        "ttc_critical_s"
+      ],
+      "title": "Thresholds",
+      "type": "object"
+    },
+    "TripSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "$ref": "#/$defs/Checks"
+        },
+        "event_counts": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "warning",
+                "critical"
+              ]
+            },
+            "type": "object"
+          },
+          "propertyNames": {
+            "enum": [
+              "forward_collision",
+              "obstacle_in_lane",
+              "tailgating",
+              "harsh_braking"
+            ]
+          },
+          "title": "Event Counts",
+          "type": "object"
+        },
+        "min_ttc_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lowest in-lane TTC over the trip; null if nothing was ever closing",
+          "title": "Min Ttc S"
+        },
+        "ttc_below_critical_s": {
+          "description": "Seconds with a road user in our lane at TTC <= critical",
+          "minimum": 0,
+          "title": "Ttc Below Critical S",
+          "type": "number"
+        },
+        "ttc_below_warning_s": {
+          "description": "Seconds with a road user in our lane at TTC <= warning threshold (includes critical time)",
+          "minimum": 0,
+          "title": "Ttc Below Warning S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ttc_below_warning_s",
+        "ttc_below_critical_s",
+        "min_ttc_s",
+        "event_counts",
+        "checks"
+      ],
+      "title": "TripSummary",
+      "type": "object"
+    },
+    "Video": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_s": {
+          "minimum": 0,
+          "title": "Duration S",
+          "type": "number"
+        },
+        "fps": {
+          "exclusiveMinimum": 0,
+          "title": "Fps",
+          "type": "number"
+        },
+        "frames_processed": {
+          "minimum": 0,
+          "title": "Frames Processed",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "duration_s",
+        "fps",
+        "frames_processed",
+        "width",
+        "height"
+      ],
+      "title": "Video",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "classes_version": {
+      "title": "Classes Version",
+      "type": "integer"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/Event"
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "hazards": {
+      "items": {
+        "$ref": "#/$defs/Hazard"
+      },
+      "title": "Hazards",
+      "type": "array"
+    },
+    "objects_seen": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "description": "Unique tracked objects per class (classes.yaml names, zero-filled), not per-frame detections",
+      "title": "Objects Seen",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "thresholds": {
+      "$ref": "#/$defs/Thresholds"
+    },
+    "trip_summary": {
+      "$ref": "#/$defs/TripSummary"
+    },
+    "video": {
+      "$ref": "#/$defs/Video"
+    }
+  },
+  "required": [
+    "classes_version",
+    "video",
+    "thresholds",
+    "events",
+    "hazards",
+    "trip_summary",
+    "objects_seen"
+  ],
+  "title": "EventsDocument",
+  "type": "object"
+}
