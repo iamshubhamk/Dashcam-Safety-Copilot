@@ -20,3 +20,6 @@ __pycache__/
 
 # Pipeline outputs
 out/
+
+# Local env files (copy from backend/.env.example)
+.env
