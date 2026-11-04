@@ -1,0 +1,79 @@
+# CI: lint, type-check and test every component on each push and PR.
+# No GPU, no training, no datasets: only the non-ML logic is tested here.
+# Every tool version is pinned so a green run today stays green next month.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUFF_VERSION: "0.14.0"
+  MYPY_VERSION: "1.18.2"
+
+jobs:
+  python:
+    name: python (${{ matrix.component }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: ml
+            package: dashcam_ml
+            check_format: false  # ml/ predates the format check; enable after a one-off `ruff format`
+            mypy_blocking: true
+          - component: perception
+            package: dashcam_perception
+            check_format: true
+            mypy_blocking: false  # 5 known pydantic typing errors in events.py; flip to true once fixed
+    defaults:
+      run:
+        working-directory: ${{ matrix.component }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: ${{ matrix.component }}/uv.lock
+      - name: Install (core + dev extras, from the lockfile)
+        run: uv sync --frozen --extra dev
+      - name: Lint
+        run: uvx ruff@${RUFF_VERSION} check .
+      - name: Format check
+        if: matrix.check_format
+        run: uvx ruff@${RUFF_VERSION} format --check .
+      - name: Type check
+        continue-on-error: ${{ !matrix.mypy_blocking }}
+        run: uv run --frozen --with mypy==${MYPY_VERSION} --with types-PyYAML==6.0.12.20250915 mypy --ignore-missing-imports ${{ matrix.package }}
+      - name: Tests
+        run: uv run --frozen pytest -q
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Type check
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npx vite build

@@ -1,0 +1,9 @@
+# Keep LF line endings in the repo so shell scripts and Dockerfiles work when
+# cloned on Windows. Git converts to CRLF only where Windows tools need it.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.gif binary
