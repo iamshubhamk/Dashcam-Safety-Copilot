@@ -94,7 +94,6 @@ jobs:
       - name: Format check
         run: uvx ruff@${RUFF_VERSION} format --check .
       - name: Type check
-        continue-on-error: true  # 2 known errors (cleanup.py:50, worker/queue.py:60); make blocking once fixed
         run: uv run --frozen --with mypy==${MYPY_VERSION} --with types-PyYAML==6.0.12.20250915 mypy --ignore-missing-imports app
       - name: Tests (incl. Alembic migrations)
         run: uv run --frozen pytest -q

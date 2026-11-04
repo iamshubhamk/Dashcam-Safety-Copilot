@@ -1,0 +1,67 @@
+# Local stack: Postgres + API + dashboard. Sized for an 8 GB laptop.
+#
+#   docker compose up -d --build      # dashboard: http://localhost:8080, API docs: http://localhost:8000/docs
+#
+# The worker (which runs the detector) is NOT in here: run it natively so it can use the GPU,
+# see docs/docker.md. It shares the database (localhost:5432) and ./data/storage with the API.
+
+name: dashcam
+
+services:
+  db:
+    image: postgres:16.11
+    environment:
+      POSTGRES_USER: dashcam
+      POSTGRES_PASSWORD: dashcam   # local-only credentials; the port is bound to 127.0.0.1
+      POSTGRES_DB: dashcam
+    # Small memory footprint: ~128 MB of shared buffers inside a 512 MB container.
+    command: >-
+      postgres -c shared_buffers=128MB -c effective_cache_size=256MB
+      -c work_mem=4MB -c maintenance_work_mem=32MB -c max_connections=30
+    mem_limit: 512m
+    shm_size: 128m
+    ports:
+      - "127.0.0.1:5432:5432"   # for the native worker and for running backend tests
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dashcam -d dashcam"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DASHCAM_DATABASE_URL: postgresql+psycopg://dashcam:dashcam@db:5432/dashcam
+      DASHCAM_STORAGE_DIR: /data/storage
+      DASHCAM_WORK_DIR: /data/work
+      DASHCAM_CORS_ORIGINS: '["http://localhost:8080","http://localhost:5173","http://127.0.0.1:5173"]'
+    volumes:
+      - ./data/storage:/data/storage   # same folder the native worker uses
+      - apiwork:/data/work
+    ports:
+      - "127.0.0.1:8000:8000"
+    mem_limit: 768m
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: frontend
+    ports:
+      - "127.0.0.1:8080:80"
+    mem_limit: 128m
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  apiwork:
